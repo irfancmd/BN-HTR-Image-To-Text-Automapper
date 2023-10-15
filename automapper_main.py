@@ -4,6 +4,25 @@ from PIL import Image
 import pandas as pd
 import streamlit as st
 from natsort import natsorted
+from xml.etree import ElementTree as ET
+import cv2
+
+
+def get_bounding_box_points(xml_path):
+  xml_file = ET.parse(xml_path)
+
+  rectangle_start_points = []
+  rectangle_end_points = []
+
+  for child in xml_file.getroot():
+    if child.tag == "object":
+      start_point = (int(child[4][0].text), int(child[4][1].text))
+      end_point = (int(child[4][2].text), int(child[4][3].text))
+
+      rectangle_start_points.append(start_point)
+      rectangle_end_points.append(end_point)
+
+  return rectangle_start_points, rectangle_end_points
 
 
 PATH = "./BN-HTR_Dataset"
@@ -27,12 +46,26 @@ image_paths = natsorted(glob.glob(f"{line_path}/{st.session_state['current_artic
 if not st.session_state.get("current_image_file_index"):
   st.session_state["current_image_file_index"] = 0
 
+if not st.session_state.get("current_line_index"):
+  st.session_state["current_line_index"] = 0
+
+if not st.session_state.get("current_word_index"):
+  st.session_state["current_word_index"] = 0
+
+# Fetching line bounding box co-ordinates
+line_rectangle_start_points, line_rectangle_end_points = get_bounding_box_points(f"{line_path}/{st.session_state['current_article_id']}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}.xml")
+
+image = cv2.imread(image_paths[st.session_state["current_image_file_index"]])
+
+# Drawing line bounding box
+image = cv2.rectangle(image, line_rectangle_start_points[st.session_state["current_line_index"]], line_rectangle_end_points[st.session_state["current_line_index"]], (255, 0, 0), 5)
+
 # ***** Left Column *****
 
 left_column.header("Current Image")
 left_column.subheader(f"Article: {st.session_state['current_article_id']} Image: {st.session_state['current_image_file_index'] + 1}")
-left_column.image(Image.open(image_paths[st.session_state["current_image_file_index"]]))
-
+# left_column.image(Image.open(image_paths[st.session_state["current_image_file_index"]]))
+left_column.image(image)
 
 def prev_image():
   if st.session_state["current_image_file_index"] > 0:
@@ -60,9 +93,6 @@ st.button("Next Image", on_click=next_image)
 # Fetching lines
 lines = natsorted(glob.glob(f"{word_path}/{st.session_state['current_article_id']}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}/*.jpg"))
 
-if not st.session_state.get("current_line_index"):
-  st.session_state["current_line_index"] = 0
-
 right_column.header("Image Details")
 
 if st.session_state["current_line_index"] > 0:
@@ -70,7 +100,17 @@ if st.session_state["current_line_index"] > 0:
   right_column.image(Image.open(lines[st.session_state["current_line_index"] - 1]))
 
 right_column.subheader("Current Line")
-right_column.image(Image.open(lines[st.session_state["current_line_index"]]))
+
+# Fetching word bounding box co-ordinates
+word_rectangle_start_points, word_rectangle_end_points = get_bounding_box_points(f"{word_path}/{st.session_state['current_article_id']}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}_{st.session_state['current_line_index'] + 1}.xml")
+
+current_line_image = cv2.imread(lines[st.session_state["current_line_index"]])
+
+# Drawing word bounding box
+current_line_image = cv2.rectangle(current_line_image, word_rectangle_start_points[st.session_state["current_word_index"]], word_rectangle_end_points[st.session_state["current_word_index"]], (255, 0, 0), 5)
+
+# right_column.image(Image.open(lines[st.session_state["current_line_index"]]))
+right_column.image(current_line_image)
 
 if st.session_state["current_line_index"] < len(lines) - 1:
   right_column.subheader("Next Line")
@@ -78,9 +118,6 @@ if st.session_state["current_line_index"] < len(lines) - 1:
 
 # Fetching image words
 words = natsorted(glob.glob(f"{word_path}/{st.session_state['current_article_id']}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}_{st.session_state['current_line_index'] + 1}/*.jpg"))
-
-if not st.session_state.get("current_word_index"):
-  st.session_state["current_word_index"] = 0
 
 if st.session_state["current_word_index"] > 0:
   right_column.subheader("Previous Word (Image)")
