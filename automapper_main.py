@@ -52,6 +52,7 @@ if not st.session_state.get("current_line_index"):
 if not st.session_state.get("current_word_index"):
   st.session_state["current_word_index"] = 0
 
+
 # Fetching line bounding box co-ordinates
 line_rectangle_start_points, line_rectangle_end_points = get_bounding_box_points(f"{line_path}/{st.session_state['current_article_id']}/{st.session_state['current_article_id']}_{st.session_state['current_image_file_index'] + 1}.xml")
 
